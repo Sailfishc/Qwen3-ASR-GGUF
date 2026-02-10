@@ -46,10 +46,6 @@ class Qwen3ASRFrontendFullOnnx(nn.Module):
 class Qwen3ASRAudioAttentionOnnx(nn.Module):
     """
     Qwen3-ASR 多头注意力 (DML 友好 + 符号追踪修复版)
-    优化策略：
-    1. 恢复显式 b, t 表达，帮助 torch.export 建立输入输出长度的符号联系。
-    2. 使用 flatten(2) 代替复杂的头部叠加逻辑。
-    3. 维持全链路加法掩码（Additive Masking）。
     """
     def __init__(self, raw_attn):
         super().__init__()
@@ -62,31 +58,17 @@ class Qwen3ASRAudioAttentionOnnx(nn.Module):
         self.out_proj = raw_attn.out_proj
 
     def forward(self, hidden_states, attention_mask=None):
-        # hidden_states: (B, T, D)
         b, t, d = hidden_states.shape
-        
-        # 1. 投影与多头切分 (B, T, D) -> (B, T, H, HD) -> (B, H, T, HD)
-        # 显式使用 b, t 帮助追踪器
         q = self.q_proj(hidden_states).view(b, t, self.num_heads, self.head_dim).transpose(1, 2)
         k = self.k_proj(hidden_states).view(b, t, self.num_heads, self.head_dim).transpose(1, 2)
         v = self.v_proj(hidden_states).view(b, t, self.num_heads, self.head_dim).transpose(1, 2)
-
-        # 2. 注意力计算
         attn_weights = torch.matmul(q, k.transpose(-1, -2)) * self.scaling
-        
         if attention_mask is not None:
-            # 标准加法掩码 (B, 1, T, T)
             attn_weights = attn_weights + attention_mask
-            
         attn_weights = F.softmax(attn_weights, dim=-1, dtype=torch.float32).to(q.dtype)
-        attn_output = torch.matmul(attn_weights, v) # (B, H, T, HD)
-        
-        # 3. 合并头 (B, H, T, HD) -> (B, T, H, HD) -> (B, T, D)
-        # 使用 flatten(2) 是 DML 最推荐的“维度压缩”方式
+        attn_output = torch.matmul(attn_weights, v)
         attn_output = attn_output.transpose(1, 2).contiguous().flatten(2)
-        
         attn_output = self.out_proj(attn_output)
-        
         return attn_output
 
 class Qwen3ASRBackendOnnx(nn.Module):
@@ -107,16 +89,38 @@ class Qwen3ASRBackendOnnx(nn.Module):
             hidden_states = layer.self_attn_layer_norm(hidden_states)
             hidden_states = layer.self_attn(hidden_states, attention_mask=attention_mask)
             hidden_states = residual + hidden_states
-            
             residual = hidden_states
             hidden_states = layer.final_layer_norm(hidden_states)
             hidden_states = layer.fc1(hidden_states)
             hidden_states = layer.activation_fn(hidden_states)
             hidden_states = layer.fc2(hidden_states)
             hidden_states = residual + hidden_states
-            
         hidden_states = self.ln_post(hidden_states)
         hidden_states = self.proj1(hidden_states)
         hidden_states = self.act(hidden_states)
         hidden_states = self.proj2(hidden_states)
         return hidden_states
+
+class Qwen3ASREncoderFullOnnx(nn.Module):
+    """
+    Qwen3-ASR 完整音频编码器 (Combined System)
+    Mel -> Frontend -> Backend -> LLM Hidden States
+    """
+    def __init__(self, audio_tower):
+        super().__init__()
+        self.frontend = Qwen3ASRFrontendFullOnnx(audio_tower)
+        self.backend = Qwen3ASRBackendOnnx(audio_tower)
+        
+    def forward(self, input_features: torch.Tensor, attention_mask: Optional[torch.Tensor] = None):
+        """
+        Args:
+            input_features: (B, 128, T)
+            attention_mask: (B, 1, T_down, T_down) -> 用于隔离窗口，设为 None 则为全屏注意力
+        """
+        # 1. 前端处理 (分块卷积 + 位置编码)
+        hidden_states = self.frontend(input_features)
+        
+        # 2. 后端处理 (Transformer)
+        last_hidden_state = self.backend(hidden_states, attention_mask=attention_mask)
+        
+        return last_hidden_state
