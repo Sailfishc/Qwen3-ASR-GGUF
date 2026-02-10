@@ -23,7 +23,7 @@ def main():
     input_mel = np.load(input_mel_path)  # (1, 128, 2850)
     baseline_full = np.load(baseline_path)  # (371, 896)
     
-    sess = ort.InferenceSession(onnx_path, providers=["CPUExecutionProvider"])
+    sess = ort.InferenceSession(onnx_path, providers=["DmlExecutionProvider", "CPUExecutionProvider"])
     
     # 2. 一键投喂验证
     print(f"验证开始：一次性向 ONNX 投喂 {input_mel.shape[2]} 帧特征...")

@@ -16,18 +16,19 @@ def export_frontend():
     os.makedirs(EXPORT_DIR, exist_ok=True)
     onnx_path = os.path.join(EXPORT_DIR, "qwen3_asr_frontend.onnx")
     
-    # 强制 float32
+    # 强制 float32 以保证导出精度
     asr_model = Qwen3ASRModel.from_pretrained(model_path, device_map="cpu", dtype=torch.float32)
     audio_tower = asr_model.model.thinker.audio_tower
     
     frontend_model = Qwen3ASRFrontendFullOnnx(audio_tower)
     frontend_model.eval()
     
-    # Dummy 输入：使用 2850 帧进行导出，并设置动态轴
+    # 使用典型的长音频作为 dummy 输入
     dummy_input = torch.randn(1, 128, 2850)
     
-    print(f"Exporting PRECISION Frontend to ONNX...")
+    print(f"Exporting PRECISION Frontend (DML Optimized) to ONNX...")
     
+    # 根据经验：停用 dynamo=True，改用传统导出模式以兼容 dynamic_axes 并在 DML 上获得更好的稳定性
     torch.onnx.export(
         frontend_model,
         (dummy_input,),
@@ -42,7 +43,7 @@ def export_frontend():
         do_constant_folding=True
     )
     
-    print(f"✅ Precision Frontend ONNX export complete!")
+    print(f"✅ Frontend ONNX export complete!")
 
 if __name__ == "__main__":
     export_frontend()
