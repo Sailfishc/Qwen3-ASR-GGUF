@@ -42,43 +42,77 @@ class AlignerProcessor:
             if buf: tokens.append("".join(buf))
         return tokens
 
-    def fix_timestamps(self, data: np.ndarray) -> np.ndarray:
-        """LIS (最长递增子序列) 修正算法"""
-        n = len(data)
-        if n == 0: return data
-        dp, parent = [1] * n, [-1] * n
+    def fix_timestamps(self, data: np.ndarray) -> List[int]:
+        """强健的时间轴修复算法 (LIS + 线性插值)"""
+        data_list = data.tolist()
+        n = len(data_list)
+        if n == 0: return []
+
+        # 1. 计算最长递增子序列 (LIS) 找到基准点
+        dp = [1] * n
+        parent = [-1] * n
         for i in range(1, n):
             for j in range(i):
-                if data[j] <= data[i] and dp[j] + 1 > dp[i]:
-                    dp[i] = dp[j] + 1; parent[i] = j
-        max_idx = dp.index(max(dp))
-        lis_indices, idx = [], max_idx
-        while idx != -1: lis_indices.append(idx); idx = parent[idx]
-        lis_indices.reverse()
+                if data_list[j] <= data_list[i] and dp[j] + 1 > dp[i]:
+                    dp[i] = dp[j] + 1
+                    parent[i] = j
         
+        max_idx = dp.index(max(dp))
+        lis_indices = []
+        idx = max_idx
+        while idx != -1:
+            lis_indices.append(idx)
+            idx = parent[idx]
+        lis_indices.reverse()
+
         is_normal = [False] * n
         for idx in lis_indices: is_normal[idx] = True
         
-        result = data.copy()
+        # 2. 对异常点进行插值或就近对齐
+        result = data_list.copy()
         i = 0
         while i < n:
             if not is_normal[i]:
                 j = i
                 while j < n and not is_normal[j]: j += 1
                 anomaly_count = j - i
-                left = next((result[k] for k in range(i-1, -1, -1) if is_normal[k]), None)
-                right = next((result[k] for k in range(j, n) if is_normal[k]), None)
+                
+                # 寻找两侧距离最近的“正常”点
+                left_val = None
+                for k in range(i - 1, -1, -1):
+                    if is_normal[k]:
+                        left_val = result[k]
+                        break
+                
+                right_val = None
+                for k in range(j, n):
+                    if is_normal[k]:
+                        right_val = result[k]
+                        break
+                
                 if anomaly_count <= 2:
-                    for k in range(i, j): result[k] = right if left is None else (left if right is None else (left if (k-i+1) <= (j-k) else right))
+                    # 异常点较少，采用就近对齐
+                    for k in range(i, j):
+                        if left_val is None: result[k] = right_val
+                        elif right_val is None: result[k] = left_val
+                        else:
+                            # 离左侧近取左，离右侧近取右
+                            result[k] = left_val if (k - (i - 1)) <= (j - k) else right_val
                 else:
-                    if left is not None and right is not None:
-                        step = (right - left) / (anomaly_count + 1)
-                        for k in range(i, j): result[k] = int(left + step * (k - i + 1))
-                    elif left is not None: result[i:j] = left
-                    elif right is not None: result[i:j] = right
+                    # 异常点较多，采用线性插值
+                    if left_val is not None and right_val is not None:
+                        step = (right_val - left_val) / (anomaly_count + 1)
+                        for k in range(i, j):
+                            result[k] = int(left_val + step * (k - i + 1))
+                    elif left_val is not None:
+                        for k in range(i, j): result[k] = left_val
+                    elif right_val is not None:
+                        for k in range(i, j): result[k] = right_val
+                
                 i = j
-            else: i += 1
-        return result
+            else:
+                i += 1
+        return [int(res) for res in result]
 
 class QwenForcedAligner:
     """Qwen3 强制对齐器 (GGUF + ONNX 版)"""
@@ -162,7 +196,7 @@ class QwenForcedAligner:
             
         # 6. 后处理
         fixed_ts = self.processor.fix_timestamps(np.array(raw_ts))
-        ms = fixed_ts * self.STEP_MS
+        ms = np.array(fixed_ts) * self.STEP_MS
         
         results = [
             AlignerResult(text=w, start_time=ms[i*2]/1000.0, end_time=ms[i*2+1]/1000.0)
