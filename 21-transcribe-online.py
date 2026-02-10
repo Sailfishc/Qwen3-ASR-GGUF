@@ -99,7 +99,6 @@ def encoder_worker_proc(to_enc_q, from_enc_q, encoder_path, mel_filters_path):
     try:
         encoder_sess = ort.InferenceSession(encoder_path, sess_options=sess_opts, providers=providers)
         used_provider = encoder_sess.get_providers()[0]
-        print(f"[编码进程] 模型已加载，当前 EP: {used_provider}")
     except Exception as e:
         print(f"[编码进程] 加载合并版 ONNX 失败: {e}")
         return
@@ -118,22 +117,18 @@ def encoder_worker_proc(to_enc_q, from_enc_q, encoder_path, mel_filters_path):
 
 
     # GPU Warmup: 跑一段音频以触发 Shader 编译和显存分配
-    warmup_seconds = 5
+    warmup_seconds = 40
     dummy_wav = np.random.randn(int(16000 * warmup_seconds)).astype(np.float32)
-    try:
-        # 模拟完整的推理流程
-        dummy_mel = mel_extractor(dummy_wav, dtype=input_dtype)
-        dummy_mel_input = dummy_mel[np.newaxis, ...]
-        t_out = _get_feat_lengths(dummy_mel.shape[1])
-        dummy_mask = np.zeros((1, 1, t_out, t_out), dtype=np.float32)
-        
-        _ = encoder_sess.run(None, {
-            "input_features": dummy_mel_input,
-            "attention_mask": dummy_mask
-        })[0]
-        print(f"[编码进程] DirectML 预热完成 (5秒音频)")
-    except Exception as e:
-        print(f"[编码进程] 预热失败 (已忽略): {e}")
+    # 模拟完整的推理流程
+    dummy_mel = mel_extractor(dummy_wav, dtype=input_dtype)
+    dummy_mel_input = dummy_mel[np.newaxis, ...]
+    t_out = _get_feat_lengths(dummy_mel.shape[1])
+    dummy_mask = np.zeros((1, 1, t_out, t_out), dtype=input_dtype)
+    
+    _ = encoder_sess.run(None, {
+        "input_features": dummy_mel_input,
+        "attention_mask": dummy_mask
+    })[0]
 
     # 发送就绪信号
     from_enc_q.put(StreamingMessage(MsgType.MSG_READY))
@@ -156,7 +151,8 @@ def encoder_worker_proc(to_enc_q, from_enc_q, encoder_path, mel_filters_path):
             # B. 计算掩码 (B, 1, T_out, T_out)
             t_mel = mel.shape[1]
             t_out = _get_feat_lengths(t_mel)
-            mask_input = np.zeros((1, 1, t_out, t_out), dtype=np.float32)
+            # 确保 Mask 精度与模型输入一致
+            mask_input = np.zeros((1, 1, t_out, t_out), dtype=input_dtype)
             
             # C. 推理 (合并版 Encoder)
             audio_embd = encoder_sess.run(None, {
@@ -345,9 +341,8 @@ class QwenASREngine:
                 ready_token = display_queue.popleft()
                 stable_tokens.append(ready_token)
                 piece = text_decoder.decode(self.model.token_to_bytes(ready_token))
-                end = '\n' if re.search('[，。？！]', piece) else ''
                 if piece:
-                    print(piece, end=end, flush=True)
+                    print(re.sub('([，。？！])', '\\1\n', piece), end='', flush=True)
                     stable_text_acc += piece
             
             # 熔断检查：检测重复循环
@@ -369,12 +364,11 @@ class QwenASREngine:
                 stable_tokens.append(t)
                 piece = text_decoder.decode(self.model.token_to_bytes(t))
                 if piece:
-                    print(piece, end="", flush=True)
+                    print(re.sub('([，。？！])', '\\1\n', piece), end="", flush=True)
                     stable_text_acc += piece
             final_p = text_decoder.decode(b"", final=True)
-            if final_p:
-                end = '\n' if re.search('[，。？！]', piece) else ''
-                print(final_p, end=end, flush=True)
+            if final_p: 
+                print(final_p, end='', flush=True)
                 stable_text_acc += final_p
         
         # 填充结果（内核输出标准化）
@@ -524,7 +518,7 @@ if __name__ == "__main__":
     
     # 定义路径
     PROJECT_ROOT = Path(__file__).parent.absolute()
-    encoder_onnx = os.path.join(PROJECT_ROOT, "model", "qwen3_asr_encoder.onnx")
+    encoder_onnx = os.path.join(PROJECT_ROOT, "model", "qwen3_asr_encoder.fp16.onnx")
     gguf = os.path.join(PROJECT_ROOT, "model", "qwen3_asr_llm.q8_0.gguf")
     mel_filters = os.path.join(PROJECT_ROOT, "model", "mel_filters.npy")
 

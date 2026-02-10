@@ -168,10 +168,17 @@ class Qwen3GGUFForcedAligner:
         
         providers = ['DmlExecutionProvider', 'CPUExecutionProvider']
         self.encoder_sess = ort.InferenceSession(
-            str(model_path / "qwen3_aligner_encoder.onnx"),
+            str(model_path / "qwen3_aligner_encoder.fp16.onnx"),
             sess_options=opt, providers=providers
         )
-        print(f"编码器 EP: {self.encoder_sess.get_providers()[0]}")
+        
+        # 动态检测输入精度
+        try:
+            fe_input_type = self.encoder_sess.get_inputs()[0].type
+            self.input_dtype = np.float16 if 'float16' in fe_input_type else np.float32
+        except:
+            self.input_dtype = np.float32
+
         self.mel_extractor = FastWhisperMel(str(model_path / "mel_filters.npy"))
 
         # B. 加载 Thinker (GGUF)
@@ -190,7 +197,6 @@ class Qwen3GGUFForcedAligner:
         self.ID_TIMESTAMP = self.model.token_to_id("<timestamp>")
         self.TIMESTAMP_STEP_MS = 80.0 # 核心步长
         
-        print(f"初始化完成。设备: CPU (llama.cpp)")
 
     def _prepare_prompt(self, text: str, language: str, n_audio_tokens: int) -> (List[str], np.ndarray):
         """构造符合官方标准的原生 Prompt (无 Chat Template)"""
@@ -211,13 +217,14 @@ class Qwen3GGUFForcedAligner:
         
         # 1. 提取音频特征
         audio, _ = librosa.load(audio_file, sr=16000)
+        # 使用感知的精度提取 Mel
         mel = self.mel_extractor(audio)
-        mel_input = mel[np.newaxis, ...] # (1, 128, T)
+        mel_input = mel[np.newaxis, ...].astype(self.input_dtype) 
         
-        # 计算掩码
+        # 计算掩码 (也要匹配精度)
         t_mel = mel.shape[1]
         t_out = _get_feat_lengths(t_mel)
-        mask_input = np.zeros((1, 1, t_out, t_out), dtype=np.float32)
+        mask_input = np.zeros((1, 1, t_out, t_out), dtype=self.input_dtype)
         
         audio_features = self.encoder_sess.run(None, {
             "input_features": mel_input,
