@@ -45,5 +45,5 @@ def setup_logging(level: int = logging.WARNING, log_file: str = os.path.join("lo
 
 
 # 初始化默认日志配置（默认 WARNING 级别，记录到 logs/latest.log）
-logger = setup_logging(level=logging.WARNING)
+logger = setup_logging(level=logging.DEBUG)
 

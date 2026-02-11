@@ -1,0 +1,73 @@
+# coding=utf-8
+import os
+from .schema import MsgType, StreamingMessage, ASREngineConfig
+from .encoder import QwenAudioEncoder
+from .aligner import QwenForcedAligner
+
+def do_encode_task(msg, encoder, from_enc_q):
+    """处理音频编码任务"""
+    audio_embd, encode_time = encoder.encode(msg.data)
+    from_enc_q.put(StreamingMessage(
+        msg_type=MsgType.MSG_EMBD, 
+        data=audio_embd, 
+        is_last=msg.is_last, 
+        encode_time=encode_time
+    ))
+
+def do_align_task(msg, aligner, from_align_q):
+    """处理时间戳对齐任务"""
+    if aligner is None:
+        from_align_q.put(StreamingMessage(MsgType.MSG_ALIGN, data=None))
+        return
+
+    try:
+        res = aligner.align(
+            msg.data, 
+            msg.text, 
+            language=msg.language, 
+            offset_sec=msg.offset_sec
+        )
+        from_align_q.put(StreamingMessage(
+            msg_type=MsgType.MSG_ALIGN, 
+            data=res, 
+            is_last=msg.is_last
+        ))
+    except Exception as e:
+        print(f"[ASRWorker] 对齐出错: {e}")
+        from_align_q.put(StreamingMessage(MsgType.MSG_ALIGN, data=None))
+
+def asr_helper_worker_proc(to_worker_q, from_enc_q, from_align_q, config: ASREngineConfig):
+    """ASR 辅助进程：同步处理任务，但分流结果回复 (一进两出架构)"""
+    
+    # 1. 资源初始化
+    encoder_onnx = os.path.join(config.model_dir, config.encoder_fn)
+    mel_filters = os.path.join(config.model_dir, config.mel_fn)
+    
+    encoder = QwenAudioEncoder(
+        encoder_path=encoder_onnx,
+        mel_filters_path=mel_filters,
+        use_dml=config.use_dml,
+        warmup_sec=5.0,
+        verbose=False
+    )
+    
+    aligner = None
+    if config.enable_aligner:
+        aligner = QwenForcedAligner(config.align_config)
+
+    from_enc_q.put(StreamingMessage(MsgType.MSG_READY))
+
+    # 2. 统一任务循环
+    while True:
+        msg: StreamingMessage = to_worker_q.get()
+        
+        if msg.msg_type == MsgType.CMD_STOP:
+            from_enc_q.put(StreamingMessage(MsgType.MSG_DONE))
+            from_align_q.put(StreamingMessage(MsgType.MSG_DONE))
+            break
+            
+        if msg.msg_type == MsgType.CMD_ENCODE:
+            do_encode_task(msg, encoder, from_enc_q)
+            
+        elif msg.msg_type == MsgType.CMD_ALIGN:
+            do_align_task(msg, aligner, from_align_q)

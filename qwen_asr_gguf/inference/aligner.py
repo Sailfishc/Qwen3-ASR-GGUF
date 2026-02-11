@@ -9,7 +9,7 @@ from typing import List, Dict, Any, Optional
 from pathlib import Path
 
 from .schema import ForcedAlignItem, ForcedAlignResult, AlignerConfig
-from .encoder import FastWhisperMel, get_feat_lengths
+from .encoder import QwenAudioEncoder
 from .utils import normalize_language_name, validate_language
 from . import llama
 
@@ -128,29 +128,103 @@ class AlignerProcessor:
             else: i += 1
         return [int(res) for res in result]
 
+    def reconcile(self, original_text: str, items: List[ForcedAlignItem]) -> List[ForcedAlignItem]:
+        """
+        根据原始文本和干净的对齐项，重组包含标点的时间戳序列。
+        原则：低耦合、内核输出标准化。
+        """
+        if not items:
+            return [ForcedAlignItem(text=original_text, start_time=0.0, end_time=0.0)] if original_text else []
+
+        reconciled = []
+        curr_ptr = 0
+        last_ts = items[0].start_time
+
+        for item in items:
+            # 搜索当前 item.text 在 original_text 中的位置 (跳过非保留字符)
+            start_pos, end_pos = self._find_token_indices(original_text, item.text, curr_ptr)
+            
+            if start_pos != -1:
+                # 1. 处理间隙项 (标点/空格)
+                if start_pos > curr_ptr:
+                    gap_text = original_text[curr_ptr:start_pos]
+                    reconciled.append(ForcedAlignItem(
+                        text=gap_text,
+                        start_time=last_ts,
+                        end_time=item.start_time
+                    ))
+                
+                # 2. 对其后的项使用原始文本中的形态
+                reconciled.append(ForcedAlignItem(
+                    text=original_text[start_pos:end_pos],
+                    start_time=item.start_time,
+                    end_time=item.end_time
+                ))
+                
+                curr_ptr = end_pos
+                last_ts = item.end_time
+            else:
+                # 降级：若无法匹配则保持原样
+                reconciled.append(item)
+                last_ts = item.end_time
+
+        # 3. 处理末尾残余
+        if curr_ptr < len(original_text):
+            reconciled.append(ForcedAlignItem(
+                text=original_text[curr_ptr:],
+                start_time=last_ts,
+                end_time=last_ts
+            ))
+
+        return reconciled
+
+    def _find_token_indices(self, text: str, target: str, start_index: int):
+        """寻找包含 target 的最小区间，允许穿插非保留字符"""
+        target_len = len(target)
+        if target_len == 0: return -1, -1
+        
+        txt_len = len(text)
+        t_ptr = 0
+        first_match = -1
+        
+        i = start_index
+        while i < txt_len:
+            ch = text[i]
+            if ch == target[t_ptr]:
+                if t_ptr == 0: first_match = i
+                t_ptr += 1
+                if t_ptr == target_len:
+                    return first_match, i + 1
+            elif self.is_kept_char(ch):
+                if first_match != -1:
+                    i = first_match 
+                    first_match = -1
+                    t_ptr = 0
+            i += 1
+        return -1, -1
+
 class QwenForcedAligner:
     """Qwen3 强制对齐器 (GGUF 后端)"""
     def __init__(self, config: AlignerConfig):
-        self.verbose = config.verbose
         encoder_onnx = os.path.join(config.model_dir, config.encoder_fn)
         llm_gguf = os.path.join(config.model_dir, config.llm_fn)
         mel_filters = os.path.join(config.model_dir, config.mel_fn)
         use_dml = config.use_dml
 
-        if self.verbose: print(f"--- [Aligner] 初始化对齐器 (DML: {use_dml}) ---")
-        self.model = llama.LlamaModel(llm_gguf)
+        # 1. 初始化统一编码器 (内部包含 5s 分片预热)
+        self.encoder = QwenAudioEncoder(
+            encoder_path=encoder_onnx,
+            mel_filters_path=mel_filters,
+            use_dml=use_dml,
+            warmup_sec=5.0,
+            verbose=False
+        )
+
+        # 2. 加载对齐 LLM
+        self.model = llama.LlamaModel(llm_gguf, n_gpu_layers=-1)
         self.embedding_table = llama.get_token_embeddings_gguf(llm_gguf)
         self.ctx = llama.LlamaContext(self.model, n_ctx=config.n_ctx, n_batch=4096, embeddings=False)
         
-        opt = ort.SessionOptions()
-        providers = ['CPUExecutionProvider']
-        if use_dml and 'DmlExecutionProvider' in ort.get_available_providers():
-            providers.insert(0, 'DmlExecutionProvider')
-        self.encoder = ort.InferenceSession(encoder_onnx, sess_options=opt, providers=providers)
-        self.mel_extractor = FastWhisperMel(mel_filters)
-        fe_input_type = self.encoder.get_inputs()[0].type
-        self.input_dtype = np.float16 if 'float16' in fe_input_type else np.float32
-
         self.processor = AlignerProcessor()
         self.ID_AUDIO_START = self.model.token_to_id("<|audio_start|>")
         self.ID_AUDIO_END = self.model.token_to_id("<|audio_end|>")
@@ -166,13 +240,8 @@ class QwenForcedAligner:
 
         t_start = time.time()
         
-        # 1. 编码 (Encoder Stage)
-        t_enc_start = time.time()
-        mel = self.mel_extractor(audio, dtype=self.input_dtype)
-        t_out = get_feat_lengths(mel.shape[1])
-        audio_embd = self.encoder.run(None, {"input_features": mel[np.newaxis, ...], "attention_mask": np.zeros((1, 1, t_out, t_out), dtype=self.input_dtype)})[0]
-        if audio_embd.ndim == 3: audio_embd = audio_embd[0]
-        t_enc = time.time() - t_enc_start
+        # 1. 编码 (Encoder Stage) - 使用统一编码器
+        audio_embd, t_enc = self.encoder.encode(audio)
 
         # 2. 分词与构建 Prompt (必须完整注入音频序列)
         words = self.processor.tokenize(text, language)
@@ -237,15 +306,17 @@ class QwenForcedAligner:
             for i, w in enumerate(words)
         ]
         
-        t_total = time.time() - t_start
-        if self.verbose: 
-            print(f"--- [Aligner] 对齐完成，总耗时: {t_total:.2f}s (Encoder: {t_enc:.2f}s, Decoder: {t_dec:.2f}s) ---")
+        # 5. [后处理] 将缺失的标点符号和空格找回来，并补全时间戳
+        final_items = self.processor.reconcile(text, items)
         
+        t_total = time.time() - t_start
+
         return ForcedAlignResult(
-            items=items,
+            items=final_items,
             performance={
                 "encoder_time": t_enc,
                 "decoder_time": t_dec,
                 "total_time": t_total
             }
         )
+

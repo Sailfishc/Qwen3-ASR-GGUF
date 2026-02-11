@@ -16,21 +16,24 @@ def main():
     # 1. 初始化引擎 (使用标准化 Config)
     config = ASREngineConfig(
         model_dir=model_dir, 
-        use_dml=False,
-        enable_aligner=True # 开启对齐功能
+        enable_aligner=False,  
     )
+    config.use_dml = True
+    config.align_config.use_dml = True
+
     engine = QwenASREngine(config=config)
     
     # 2. 加载音频
     print(f"\n加载音频: {audio_path}\n")
-    audio = load_audio(audio_path, start_second=0, duration=120)
+    audio = load_audio(audio_path, start_second=0, duration=300)
     
     # 3. 执行转录
     res = engine.transcribe(
         audio=audio,
         context="这是1004期睡前消息，主持人叫督工，助理叫静静。",
         language="Chinese",
-        chunk_size_sec=40.0
+        chunk_size_sec=40.0, 
+        memory_chunks=1
     )
     
     # 4. ITN 后处理与输出

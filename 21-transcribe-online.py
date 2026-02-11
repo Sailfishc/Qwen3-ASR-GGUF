@@ -540,7 +540,7 @@ if __name__ == "__main__":
         context="",
         language="Chinese", # 强制指定语言 (如 'Chinese', 'English', None)
         start_second=0.0,   # 从何处开始读音频
-        duration=120,       # 读取多长音频，None 表示全部读取
+        duration=300,       # 读取多长音频，None 表示全部读取
         temperature=0.4,    # LLM Decode 温度
         chunk_size=40.0,    # 每一片段的时长
         memory_num=2,       # 记忆多少片段

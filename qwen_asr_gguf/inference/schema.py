@@ -6,18 +6,23 @@ import numpy as np
 
 class MsgType(Enum):
     CMD_ENCODE = auto()   # 主进程 -> Encoder: 编码请求
-    CMD_STOP = auto()     # 主进程 -> Encoder: 停止请求
-    MSG_EMBD = auto()     # Encoder -> 主进程: 返回特征
-    MSG_READY = auto()    # Encoder -> 主进程: 就绪信号
-    MSG_DONE = auto()     # Encoder -> 主进程: 已退出信号
+    CMD_ALIGN = auto()    # 主进程 -> Aligner: 对齐请求
+    CMD_STOP = auto()     # 主进程 -> Worker: 停止请求
+    MSG_EMBD = auto()     # Worker -> 主进程: 返回特征 (Encoder)
+    MSG_ALIGN = auto()    # Worker -> 主进程: 返回对齐结果 (Aligner)
+    MSG_READY = auto()    # Worker -> 主进程: 就绪信号
+    MSG_DONE = auto()     # Worker -> 主进程: 已退出信号
 
 @dataclass
 class StreamingMessage:
-    """音频编码进程通信协议"""
+    """音频编码/对齐进程通用通信协议"""
     msg_type: MsgType
-    data: Any = None         # 存放音频 chunk 或 embedding 结果
+    data: Any = None         # 存放音频 chunk 或 embedding/align 结果
+    text: Optional[str] = None # 用于对齐的文本
+    offset_sec: float = 0.0  # 对齐的时间轴偏移
+    language: Optional[str] = None # 语言
     is_last: bool = False    # 标记是否为最后一段音频
-    encode_time: float = 0.0 # 编码器实际耗时
+    encode_time: float = 0.0 # 耗时统计
 
 @dataclass
 class DecodeResult:
@@ -62,7 +67,6 @@ class AlignerConfig:
     mel_fn: str = "mel_filters.npy"
     use_dml: bool = False
     n_ctx: int = 8192
-    verbose: bool = True
 
 @dataclass
 class ASREngineConfig:
@@ -81,8 +85,7 @@ class ASREngineConfig:
         if self.align_config is None:
             self.align_config = AlignerConfig(
                 model_dir=self.model_dir,
-                use_dml=self.use_dml,
-                verbose=self.verbose
+                use_dml=self.use_dml
             )
 
 @dataclass
