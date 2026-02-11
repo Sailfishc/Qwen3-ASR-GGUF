@@ -1,8 +1,10 @@
 # coding=utf-8
+import os
 import time
 import unicodedata
 import numpy as np
 import onnxruntime as ort
+import codecs
 from typing import List, Dict, Any, Optional
 from pathlib import Path
 
@@ -12,6 +14,19 @@ from . import llama
 
 class AlignerProcessor:
     """文本预处理与时间戳修正逻辑"""
+    def __init__(self):
+        self.assets_dir = Path(__file__).parent / "assets"
+        ko_dict_path = self.assets_dir / "korean_dict_jieba.dict"
+        self.ko_score = {}
+        if ko_dict_path.exists():
+            with open(ko_dict_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line:
+                        word = line.split()[0]
+                        self.ko_score[word] = 1.0
+        self.ko_tokenizer = None
+
     def is_kept_char(self, ch: str) -> bool:
         if ch == "'": return True
         cat = unicodedata.category(ch)
@@ -27,12 +42,37 @@ class AlignerProcessor:
                 0x2B740 <= code <= 0x2B81F or 0x2B820 <= code <= 0x2CEAF or
                 0xF900 <= code <= 0xFAFF)
 
-    def tokenize(self, text: str) -> List[str]:
+    def tokenize_japanese(self, text: str) -> List[str]:
+        try:
+            import nagisa
+            words = nagisa.tagging(text).words
+        except ImportError:
+            return list(text)
+        tokens = []
+        for w in words:
+            cleaned = self.clean_token(w)
+            if cleaned: tokens.append(cleaned)
+        return tokens
+
+    def tokenize_korean(self, text: str) -> List[str]:
+        if self.ko_tokenizer is None:
+            try:
+                from soynlp.tokenizer import LTokenizer
+                self.ko_tokenizer = LTokenizer(scores=self.ko_score)
+            except ImportError:
+                return list(text)
+        raw_tokens = self.ko_tokenizer.tokenize(text)
+        tokens = []
+        for w in raw_tokens:
+            w_clean = self.clean_token(w)
+            if w_clean: tokens.append(w_clean)
+        return tokens
+
+    def tokenize_chinese_mixed(self, text: str) -> List[str]:
         tokens = []
         for seg in text.split():
             cleaned = self.clean_token(seg)
             if not cleaned: continue
-            # 处理中文字符切分
             buf = []
             for ch in cleaned:
                 if self.is_cjk_char(ch):
@@ -42,33 +82,27 @@ class AlignerProcessor:
             if buf: tokens.append("".join(buf))
         return tokens
 
+    def tokenize(self, text: str, language: str = "Chinese") -> List[str]:
+        lang = language.lower()
+        if lang == "japanese": return self.tokenize_japanese(text)
+        elif lang == "korean": return self.tokenize_korean(text)
+        else: return self.tokenize_chinese_mixed(text)
+
     def fix_timestamps(self, data: np.ndarray) -> List[int]:
-        """强健的时间轴修复算法 (LIS + 线性插值)"""
         data_list = data.tolist()
         n = len(data_list)
         if n == 0: return []
-
-        # 1. 计算最长递增子序列 (LIS) 找到基准点
-        dp = [1] * n
-        parent = [-1] * n
+        dp, parent = [1] * n, [-1] * n
         for i in range(1, n):
             for j in range(i):
                 if data_list[j] <= data_list[i] and dp[j] + 1 > dp[i]:
-                    dp[i] = dp[j] + 1
-                    parent[i] = j
-        
+                    dp[i] = dp[j] + 1; parent[i] = j
         max_idx = dp.index(max(dp))
-        lis_indices = []
-        idx = max_idx
-        while idx != -1:
-            lis_indices.append(idx)
-            idx = parent[idx]
+        lis_indices, idx = [], max_idx
+        while idx != -1: lis_indices.append(idx); idx = parent[idx]
         lis_indices.reverse()
-
         is_normal = [False] * n
         for idx in lis_indices: is_normal[idx] = True
-        
-        # 2. 对异常点进行插值或就近对齐
         result = data_list.copy()
         i = 0
         while i < n:
@@ -76,133 +110,108 @@ class AlignerProcessor:
                 j = i
                 while j < n and not is_normal[j]: j += 1
                 anomaly_count = j - i
-                
-                # 寻找两侧距离最近的“正常”点
-                left_val = None
-                for k in range(i - 1, -1, -1):
-                    if is_normal[k]:
-                        left_val = result[k]
-                        break
-                
-                right_val = None
-                for k in range(j, n):
-                    if is_normal[k]:
-                        right_val = result[k]
-                        break
-                
+                left_val = next((result[k] for k in range(i-1, -1, -1) if is_normal[k]), None)
+                right_val = next((result[k] for k in range(j, n) if is_normal[k]), None)
                 if anomaly_count <= 2:
-                    # 异常点较少，采用就近对齐
                     for k in range(i, j):
                         if left_val is None: result[k] = right_val
                         elif right_val is None: result[k] = left_val
-                        else:
-                            # 离左侧近取左，离右侧近取右
-                            result[k] = left_val if (k - (i - 1)) <= (j - k) else right_val
+                        else: result[k] = left_val if (k-i+1) <= (j-k) else right_val
                 else:
-                    # 异常点较多，采用线性插值
                     if left_val is not None and right_val is not None:
                         step = (right_val - left_val) / (anomaly_count + 1)
-                        for k in range(i, j):
-                            result[k] = int(left_val + step * (k - i + 1))
-                    elif left_val is not None:
-                        for k in range(i, j): result[k] = left_val
-                    elif right_val is not None:
-                        for k in range(i, j): result[k] = right_val
-                
+                        for k in range(i, j): result[k] = int(left_val + step * (k-i+1))
+                    elif left_val is not None: result[i:j] = [left_val] * anomaly_count
+                    elif right_val is not None: result[i:j] = [right_val] * anomaly_count
                 i = j
-            else:
-                i += 1
+            else: i += 1
         return [int(res) for res in result]
 
 class QwenForcedAligner:
-    """Qwen3 强制对齐器 (GGUF + ONNX 版)"""
+    """Qwen3 强制对齐器 (GGUF 后端)"""
     def __init__(self, encoder_onnx: str, llm_gguf: str, mel_filters: str, verbose: bool = True, use_dml: bool = True):
         self.verbose = verbose
         if verbose: print("--- [Aligner] 初始化对齐器 ---")
-        
-        # 1. 编码器 (同步加载，非流式)
-        opt = ort.SessionOptions()
-        opt.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
-        
-        providers = ['CPUExecutionProvider']
-        if use_dml and  'DmlExecutionProvider' in ort.get_available_providers():
-            providers.insert(0, 'DmlExecutionProvider') 
-            
-        self.encoder = ort.InferenceSession(encoder_onnx, sess_options=opt, providers=providers)
-        self.mel_extractor = FastWhisperMel(mel_filters)
-        
-        # 识别精度
-        try:
-            fe_type = self.encoder.get_inputs()[0].type
-            self.input_dtype = np.float16 if 'float16' in fe_type else np.float32
-        except: self.input_dtype = np.float32
-
-        # 2. LLM GGUF
         self.model = llama.LlamaModel(llm_gguf)
         self.embedding_table = llama.get_token_embeddings_gguf(llm_gguf)
-        self.ctx = llama.LlamaContext(self.model, n_ctx=4096, n_batch=4096)
+        self.ctx = llama.LlamaContext(self.model, n_ctx=8192, n_batch=4096, embeddings=False)
         
+        opt = ort.SessionOptions()
+        providers = ['CPUExecutionProvider']
+        if use_dml and 'DmlExecutionProvider' in ort.get_available_providers():
+            providers.insert(0, 'DmlExecutionProvider')
+        self.encoder = ort.InferenceSession(encoder_onnx, sess_options=opt, providers=providers)
+        self.mel_extractor = FastWhisperMel(mel_filters)
+        fe_input_type = self.encoder.get_inputs()[0].type
+        self.input_dtype = np.float16 if 'float16' in fe_input_type else np.float32
+
         self.processor = AlignerProcessor()
-        self.ID_AUDIO_PAD = 151676
+        self.ID_AUDIO_START = self.model.token_to_id("<|audio_start|>")
+        self.ID_AUDIO_END = self.model.token_to_id("<|audio_end|>")
         self.ID_TIMESTAMP = self.model.token_to_id("<timestamp>")
         self.STEP_MS = 80.0
 
     def align(self, audio: np.ndarray, text: str, language: str = "Chinese") -> ForcedAlignResult:
         t0 = time.time()
-        
-        # 1. Encoder 推理
+        # 1. 编码
         mel = self.mel_extractor(audio, dtype=self.input_dtype)
-        mel_input = mel[np.newaxis, ...]
         t_out = get_feat_lengths(mel.shape[1])
-        mask_input = np.zeros((1, 1, t_out, t_out), dtype=self.input_dtype)
-        
-        audio_embd = self.encoder.run(None, {"input_features": mel_input, "attention_mask": mask_input})[0]
+        audio_embd = self.encoder.run(None, {"input_features": mel[np.newaxis, ...], "attention_mask": np.zeros((1, 1, t_out, t_out), dtype=self.input_dtype)})[0]
         if audio_embd.ndim == 3: audio_embd = audio_embd[0]
-        n_aud = audio_embd.shape[0]
+
+        # 2. 分词与构建 Prompt (必须完整注入音频序列)
+        words = self.processor.tokenize(text, language)
+        def tk(t): return self.model.tokenize(t)
         
-        # 2. 构造 Prompt
-        words = self.processor.tokenize(text)
-        align_text = "<|audio_start|><|audio_pad|><|audio_end|>" + "<timestamp><timestamp>".join(words) + "<timestamp><timestamp>"
-        # 展开占位符
-        expanded_audio = f"<|audio_start|>{'<|audio_pad|>' * n_aud}<|audio_end|>"
-        full_text = align_text.replace("<|audio_start|><|audio_pad|><|audio_end|>", expanded_audio)
+        pre_ids = [self.ID_AUDIO_START]
+        post_ids = [self.ID_AUDIO_END]
+        ts_positions = []
         
-        input_ids = self.model.tokenize(full_text, add_special=False, parse_special=True)
-        n_tok = len(input_ids)
-        
-        # 3. 构造 Embedding
-        full_embd = self.embedding_table[input_ids].copy()
-        audio_indices = np.where(np.array(input_ids) == self.ID_AUDIO_PAD)[0]
-        for i, idx in enumerate(audio_indices):
-            if i < n_aud: full_embd[idx] = audio_embd[i]
+        # 官方结构: <audio> + word1 + <TS1> + <TS2> + word2 + <TS3> + <TS4> ...
+        prefix_len = len(pre_ids) + audio_embd.shape[0] + len(post_ids)
+        current_post_len = 0
+        for word in words:
+            word_tokens = tk(word)
+            post_ids.extend(word_tokens)
+            current_post_len += len(word_tokens)
             
-        # 4. GGUF NAR 推理 (4D-RoPE)
-        pos_base = np.arange(0, n_tok, dtype=np.int32)
-        pos_arr = np.concatenate([pos_base, pos_base, pos_base, np.zeros(n_tok, dtype=np.int32)])
-        batch = llama.LlamaBatch(n_tok * 4, embd_dim=1024)
+            # 记录第一个 TS 坐标 (Start)
+            ts_positions.append(prefix_len + current_post_len) 
+            post_ids.append(self.ID_TIMESTAMP)
+            current_post_len += 1
+            
+            # 记录第二个 TS 坐标 (End)
+            ts_positions.append(prefix_len + current_post_len)
+            post_ids.append(self.ID_TIMESTAMP)
+            current_post_len += 1
+
+        # 构建最终全量序列
+        n_total = len(pre_ids) + audio_embd.shape[0] + len(post_ids)
+        full_embd = np.zeros((n_total, self.model.n_embd), dtype=np.float32)
+        full_embd[:len(pre_ids)] = self.embedding_table[pre_ids]
+        full_embd[len(pre_ids):len(pre_ids)+audio_embd.shape[0]] = audio_embd
+        full_embd[len(pre_ids)+audio_embd.shape[0]:] = self.embedding_table[post_ids]
+
+        # 3. 推理获取 Logits
+        pos_base = np.arange(n_total, dtype=np.int32)
+        pos_arr = np.concatenate([pos_base, pos_base, pos_base, np.zeros(n_total, dtype=np.int32)])
+        batch = llama.LlamaBatch(n_total * 4, embd_dim=1024)
         batch.set_embd(full_embd, pos=pos_arr)
-        for i in range(n_tok): batch.logits[i] = 1
+        for idx in ts_positions: batch.logits[idx] = 1 # 只计算 timestamp 处的 logits 以提速
         
         self.ctx.clear_kv_cache()
         self.ctx.decode(batch)
         
-        # 5. 解析 Logits
-        ts_indices = np.where(np.array(input_ids) == self.ID_TIMESTAMP)[0]
+        # 4. 解析结果
         raw_ts = []
-        for idx in ts_indices:
-            logits_ptr = self.ctx.get_logits_ith(idx)
+        for idx in ts_positions:
+            logits_ptr = self.ctx.get_logits_ith(batch.n_tokens - (n_total - idx)) # 对应 batch 中的索引
             logits = np.ctypeslib.as_array(logits_ptr, shape=(152064,))
-            raw_ts.append(np.argmax(logits[:5000])) # 0-400s
+            raw_ts.append(np.argmax(logits[:4000]))
             
-        # 6. 后处理
         fixed_ts = self.processor.fix_timestamps(np.array(raw_ts))
         ms = np.array(fixed_ts) * self.STEP_MS
+        items = [ForcedAlignItem(text=w, start_time=ms[i*2]/1000.0, end_time=ms[i*2+1]/1000.0) for i, w in enumerate(words)]
         
-        items = [
-            ForcedAlignItem(text=w, start_time=ms[i*2]/1000.0, end_time=ms[i*2+1]/1000.0)
-            for i, w in enumerate(words)
-        ]
-        
-        if self.verbose:
-            print(f"--- [Aligner] 对齐完成，耗时: {time.time()-t0:.2f}s ---")
+        if self.verbose: print(f"--- [Aligner] 对齐完成，耗时: {time.time()-t0:.2f}s ---")
         return ForcedAlignResult(items=items)
