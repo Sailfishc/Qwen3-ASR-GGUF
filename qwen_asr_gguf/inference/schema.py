@@ -31,9 +31,23 @@ class DecodeResult:
     n_generate: int = 0      # 生成 token 数
     is_aborted: bool = False # 是否因重复或其他原因熔断中断
 
-@dataclass
-class AlignerResult:
-    """对齐结果标准化"""
+@dataclass(frozen=True)
+class ForcedAlignItem:
+    """单个词/字符的对齐结果"""
     text: str
     start_time: float        # 单位：秒
     end_time: float          # 单位：秒
+
+@dataclass(frozen=True)
+class ForcedAlignResult:
+    """对齐结果标准化集合 (官方结构化输出格式)"""
+    items: List[ForcedAlignItem]
+
+    def __iter__(self):
+        return iter(self.items)
+
+    def __len__(self):
+        return len(self.items)
+
+    def __getitem__(self, idx: int) -> ForcedAlignItem:
+        return self.items[idx]

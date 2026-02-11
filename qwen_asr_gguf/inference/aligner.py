@@ -6,7 +6,7 @@ import onnxruntime as ort
 from typing import List, Dict, Any, Optional
 from pathlib import Path
 
-from .schema import AlignerResult
+from .schema import ForcedAlignItem, ForcedAlignResult
 from .encoder import FastWhisperMel, get_feat_lengths
 from . import llama
 
@@ -147,7 +147,7 @@ class QwenForcedAligner:
         self.ID_TIMESTAMP = self.model.token_to_id("<timestamp>")
         self.STEP_MS = 80.0
 
-    def align(self, audio: np.ndarray, text: str, language: str = "Chinese") -> List[AlignerResult]:
+    def align(self, audio: np.ndarray, text: str, language: str = "Chinese") -> ForcedAlignResult:
         t0 = time.time()
         
         # 1. Encoder 推理
@@ -198,11 +198,11 @@ class QwenForcedAligner:
         fixed_ts = self.processor.fix_timestamps(np.array(raw_ts))
         ms = np.array(fixed_ts) * self.STEP_MS
         
-        results = [
-            AlignerResult(text=w, start_time=ms[i*2]/1000.0, end_time=ms[i*2+1]/1000.0)
+        items = [
+            ForcedAlignItem(text=w, start_time=ms[i*2]/1000.0, end_time=ms[i*2+1]/1000.0)
             for i, w in enumerate(words)
         ]
         
         if self.verbose:
             print(f"--- [Aligner] 对齐完成，耗时: {time.time()-t0:.2f}s ---")
-        return results
+        return ForcedAlignResult(items=items)
