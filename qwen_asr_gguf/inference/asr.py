@@ -11,6 +11,7 @@ from typing import Optional, List
 
 from .schema import MsgType, StreamingMessage, DecodeResult
 from .encoder import encoder_worker_proc
+from .utils import normalize_language_name, validate_language
 from . import llama
 
 class QwenASREngine:
@@ -176,6 +177,11 @@ class QwenASREngine:
         rollback_num: int = 5
     ) -> str:
         """运行完整转录流水线"""
+        # 语言归一化与校验
+        if language:
+            language = normalize_language_name(language)
+            validate_language(language)
+
         sr = 16000
         samples_per_chunk = int(chunk_size_sec * sr)
         total_len = len(audio)

@@ -10,6 +10,7 @@ from pathlib import Path
 
 from .schema import ForcedAlignItem, ForcedAlignResult
 from .encoder import FastWhisperMel, get_feat_lengths
+from .utils import normalize_language_name, validate_language
 from . import llama
 
 class AlignerProcessor:
@@ -152,6 +153,12 @@ class QwenForcedAligner:
         self.STEP_MS = 80.0
 
     def align(self, audio: np.ndarray, text: str, language: str = "Chinese") -> ForcedAlignResult:
+        """执行强制对齐"""
+        # 语言归一化与校验
+        if language:
+            language = normalize_language_name(language)
+            validate_language(language)
+
         t0 = time.time()
         # 1. 编码
         mel = self.mel_extractor(audio, dtype=self.input_dtype)
