@@ -126,8 +126,8 @@ EXPORT_DIR = r'./model'
 python 01-Export-Mel-Filters.py       # Mel 滤波器权重
 python 02-Export-ASR-Encoder-ONNX.py  # ASR Encoder 导出为 onnx 格式
 python 03-Quantize-ASR-Encoder.py     # ASR Encoder 量化为 FP16/INT8
-python 04-Convert-ASR-Decoder-GGUF.py # ASR Decoder 导出为 HF 格式
-python 05-Export-ASR-Decoder-HF.py    # ASR Decoder 转为 GGUF 格式
+python 04-Export-ASR-Decoder-HF.py    # ASR Decoder 导出为 HF 格式
+python 05-Convert-ASR-Decoder-GGUF.py # ASR Decoder 转为 GGUF 格式
 
 python 12-Export-Aligner-Encoder-ONNX.py  # ForceAligner Encoder 导出为 onnx 格式
 python 13-Quantize-Aligner-Encoder.py     # ForceAligner Encoder 量化为 FP16/INT8
@@ -209,8 +209,8 @@ graph TD
 ├── 01-Export-Mel-Filters.py        # 导出音频预处理权重
 ├── 02-Export-ASR-Encoder-ONNX.py   # 导出 ASR 编码器 (ONNX)
 ├── 03-Quantize-ASR-Encoder.py      # ASR 编码器量化 (INT8/FP16)
-├── 04-Convert-ASR-Decoder-GGUF.py  # ASR 解码器转为 GGUF 格式
-├── 05-Export-ASR-Decoder-HF.py     # ASR 解码器权重提取 (HF)
+├── 04-Export-ASR-Decoder-HF.py     # ASR 解码器权重提取 (HF)
+├── 05-Convert-ASR-Decoder-GGUF.py  # ASR 解码器转为 GGUF 格式
 ├── 12-Export-Aligner-Encoder-ONNX.py # 导出对齐编码器
 ├── 13-Quantize-Aligner-Encoder.py  # 对齐编码器量化
 ├── 21-Run-ASR.py                   # 完整转录示例脚本（主程序）
