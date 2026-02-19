@@ -26,25 +26,39 @@ class Qwen3ASRFrontendFullOnnx(nn.Module):
         return output_lengths
 
     def forward(self, input_features: torch.Tensor):
+        # 1. 设置长度与填充 (维持 100 帧块对齐)
         t = input_features.shape[2] 
         chunk_size = 100
         expected_len = self._get_feat_extract_output_lengths(t)
         pad_len = (chunk_size - (t % chunk_size)) % chunk_size
         x = F.pad(input_features, (0, pad_len))
-        x = x.unfold(2, chunk_size, chunk_size)
-        x = x.permute(0, 2, 1, 3).contiguous()
-        x = x.flatten(0, 1).unsqueeze(1)
-        x = F.gelu(self.conv2d1(x))
-        x = F.gelu(self.conv2d2(x))
-        x = F.gelu(self.conv2d3(x))
-        x = x.permute(0, 3, 1, 2).contiguous()
-        x = x.flatten(2, 3) 
+        
+        # 2. 升维至 3D 模拟分块隔离 (Batch=1, Channel=1, Chunks=N, Freq=128, T_chunk=100)
+        # 使用 unfold 物理隔离块，保证余弦相似度 1.0
+        x = x.unfold(2, chunk_size, chunk_size) # (1, 128, num_chunks, 100)
+        x = x.permute(0, 2, 1, 3).unsqueeze(1)  # (1, 1, num_chunks, 128, 100)
+        
+        # 3. 3D 卷积推理 (空间维度步长 2, 深度维度步长 1)
+        # 由于卷积核在深度轴(Chunks)大小为 1，确保了块与块之间完全无数据泄漏
+        x = F.gelu(F.conv3d(x, self.conv2d1.weight.unsqueeze(2), self.conv2d1.bias, stride=(1, 2, 2), padding=(0, 1, 1)))
+        x = F.gelu(F.conv3d(x, self.conv2d2.weight.unsqueeze(2), self.conv2d2.bias, stride=(1, 2, 2), padding=(0, 1, 1)))
+        x = F.gelu(F.conv3d(x, self.conv2d3.weight.unsqueeze(2), self.conv2d3.bias, stride=(1, 2, 2), padding=(0, 1, 1)))
+        
+        # 4. 维度变换与输出映射 (Batch=1, Chunks*T_out, Hidden)
+        # 使用 permute + flatten 替代 view 以兼容 DML 动态形状
+        x = x.permute(0, 2, 4, 1, 3).contiguous() # (1, Chunks, 13, C, F)
+        x = x.flatten(1, 2) # (1, Chunks*13, C, F)
+        x = x.flatten(2)    # (1, Chunks*13, D_conv)
         x = self.conv_out(x)
-        # 位置编码切片依然使用固定的 13
-        pos_embed = self.pos_embed_table[:13, :].unsqueeze(0)
+        
+        # 5. 符号化位置编码 (依据经验文档 4.1 节，使用 cumsum 消除动态维度视图依赖)
+        # 生成 [0..12, 0..12, ...] 循环索引
+        t_out = x.shape[1]
+        indices = (torch.ones(t_out, device=x.device, dtype=torch.long).cumsum(0) - 1) % 13
+        pos_embed = self.pos_embed_table[indices, :].unsqueeze(0)
         x = x + pos_embed
-        # 这里使用 self.d_model 以兼容不同模型
-        x = x.flatten(0, 1).unsqueeze(0)
+        
+        # 6. 对齐官方长度
         x = x[:, :expected_len, :]
         return x
 
@@ -64,14 +78,23 @@ class Qwen3ASRAudioAttentionOnnx(nn.Module):
 
     def forward(self, hidden_states, attention_mask=None):
         b, t, d = hidden_states.shape
-        q = self.q_proj(hidden_states).view(b, t, self.num_heads, self.head_dim).transpose(1, 2)
-        k = self.k_proj(hidden_states).view(b, t, self.num_heads, self.head_dim).transpose(1, 2)
-        v = self.v_proj(hidden_states).view(b, t, self.num_heads, self.head_dim).transpose(1, 2)
+        # 使用 unflatten/transpose 替代 view 
+        # 经验文档建议：在 DML 中尽量保持 Batch=1 
+        q = self.q_proj(hidden_states).unflatten(-1, (self.num_heads, self.head_dim)).transpose(1, 2)
+        k = self.k_proj(hidden_states).unflatten(-1, (self.num_heads, self.head_dim)).transpose(1, 2)
+        v = self.v_proj(hidden_states).unflatten(-1, (self.num_heads, self.head_dim)).transpose(1, 2)
+        
         attn_weights = torch.matmul(q, k.transpose(-1, -2)) * self.scaling
+        
         if attention_mask is not None:
+            # 依据经验文档 4.2 节：使用 Additive Masking 替代昂贵的 masked_fill
+            # DML 对 Add 算子的融合效果显著优于 Where (masked_fill)
             attn_weights = attn_weights + attention_mask
+            
         attn_weights = F.softmax(attn_weights, dim=-1, dtype=torch.float32).to(q.dtype)
         attn_output = torch.matmul(attn_weights, v)
+        
+        # 展平输出
         attn_output = attn_output.transpose(1, 2).contiguous().flatten(2)
         attn_output = self.out_proj(attn_output)
         return attn_output

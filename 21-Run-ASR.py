@@ -39,7 +39,7 @@ def main():
         chunk_size=40.0, 
         memory_num=1,
         start_second=0,
-        duration=0
+        duration=40
     )
     
     
