@@ -28,7 +28,6 @@ def export_frontend():
     
     print(f"Exporting PRECISION Frontend (DML Optimized) to ONNX...")
     
-    # 根据经验：停用 dynamo=True，改用传统导出模式以兼容 dynamic_axes 并在 DML 上获得更好的稳定性
     torch.onnx.export(
         frontend_model,
         (dummy_input,),
@@ -40,7 +39,8 @@ def export_frontend():
             "frontend_output": {0: "batch", 1: "time"},
         },
         opset_version=18,
-        do_constant_folding=True
+        do_constant_folding=True, 
+        dynamo=True
     )
     
     print(f"✅ Frontend ONNX export complete!")
