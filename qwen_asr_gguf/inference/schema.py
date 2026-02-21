@@ -65,12 +65,11 @@ class AlignerConfig:
     # 拆分为 Frontend 和 Backend
     encoder_frontend_fn: str = "qwen3_aligner_encoder_frontend.fp16.onnx"
     encoder_backend_fn: str = "qwen3_aligner_encoder_backend.fp16.onnx"
-    # encoder_fn: str = "qwen3_aligner_encoder.fp16.onnx" (Deprecated)
     
-    llm_fn: str = "qwen3_aligner_llm.q8_0.gguf"
+    llm_fn: str = "qwen3_aligner_llm.q4_k.gguf" 
     mel_fn: str = "mel_filters.npy"
     use_dml: bool = False
-    n_ctx: int = 4096
+    n_ctx: int = 2048       # 对于 Aligner Decoder，每秒音频+文字，约占 30 个 token
 
 @dataclass
 class ASREngineConfig:
@@ -79,12 +78,11 @@ class ASREngineConfig:
     # 拆分为 Frontend 和 Backend
     encoder_frontend_fn: str = "qwen3_asr_encoder_frontend.fp16.onnx"
     encoder_backend_fn: str = "qwen3_asr_encoder_backend.fp16.onnx"
-    # encoder_fn: str = "qwen3_asr_encoder.fp16.onnx" (Deprecated)
     
-    llm_fn: str = "qwen3_asr_llm.q8_0.gguf"
+    llm_fn: str = "qwen3_asr_llm.q4_k.gguf"
     mel_fn: str = "mel_filters.npy"
     use_dml: bool = False
-    n_ctx: int = 4096
+    n_ctx: int = 4096       # 对于 ASR Decoder，每秒音频+文字，约占 20 个 token
     verbose: bool = True
     enable_aligner: bool = False
     align_config: Optional[AlignerConfig] = None
