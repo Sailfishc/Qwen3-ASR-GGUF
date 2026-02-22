@@ -57,7 +57,7 @@ def alignment_to_srt(items: Optional[List[ForcedAlignItem]], max_chars: int = 40
         content = "".join(current_texts).strip()
         if content:
             # 移除末尾标点
-            content = content.rstrip("，。？！、,.?!")
+            content = content.rstrip("，。？！：、,.?!")
             # 应用 ITN 处理
             itn_content = itn(content)
             end_time = items[-1].end_time
@@ -110,7 +110,7 @@ def export_to_txt(path: str, result: TranscribeResult):
     # 1. ITN 处理
     final_text = itn(result.text)
     # 2. 按照标点符号换行，保留标点
-    formatted_text = re.sub(r'([，。？！])', r'\1\n', final_text)
+    formatted_text = re.sub(r'([，。？！：])', r'\1\n', final_text)
     # 3. 对于英文字母后面的逗号空格、句号空格，也要换行
     formatted_text = re.sub(r'(?<=[a-zA-Z])([,\.] )', r'\1\n', formatted_text)
     
