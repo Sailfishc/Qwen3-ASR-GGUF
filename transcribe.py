@@ -94,6 +94,8 @@ def transcribe(
         encoder_frontend_fn=asr_files["frontend"],
         encoder_backend_fn=asr_files["backend"],
         n_ctx=n_ctx,
+        chunk_size=chunk_size,
+        memory_num=memory_num,
         enable_aligner=timestamp,
         align_config=align_config,
         verbose=verbose
@@ -141,11 +143,9 @@ def transcribe(
                 audio_file=str(audio_path),
                 language=language,
                 context=context,
-                chunk_size=chunk_size,
                 start_second=seek_start,
                 duration=duration,
                 temperature=temperature,
-                memory_num=memory_num
             )
 
             # 6. 导出结果
