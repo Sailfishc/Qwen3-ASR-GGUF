@@ -51,7 +51,7 @@ def asr_helper_worker_proc(to_worker_q, from_enc_q, from_align_q, config: ASREng
         backend_path=backend_path,
         mel_filters_path=mel_filters,
         use_dml=config.use_dml,
-        warmup_sec=5.0,
+        warmup_sec=config.chunk_size,
         verbose=False
     )
     

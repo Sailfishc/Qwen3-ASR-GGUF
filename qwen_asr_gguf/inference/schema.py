@@ -82,7 +82,9 @@ class ASREngineConfig:
     llm_fn: str = "qwen3_asr_llm.q4_k.gguf"
     mel_fn: str = "mel_filters.npy"
     use_dml: bool = False
-    n_ctx: int = 4096       # 对于 ASR Decoder，每秒音频+文字，约占 20 个 token
+    n_ctx: int = 4096           # 对于 ASR Decoder，每秒音频+文字，约占 20 个 token
+    chunk_size: float = 40.0    # 每个片段 40s，对应 800 个 token
+    memory_num: int = 1         # 记忆一个片段，转录一个片段，对应 1600 个 token
     verbose: bool = True
     enable_aligner: bool = False
     align_config: Optional[AlignerConfig] = None

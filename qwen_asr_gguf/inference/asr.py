@@ -27,6 +27,7 @@ class ASRS_Segment:
 class QwenASREngine:
     """Qwen3-ASR 流式转录引擎 (GGUF 后端) - 统一辅助进程架构"""
     def __init__(self, config: ASREngineConfig):
+        self.config = config
         self.verbose = config.verbose
         if self.verbose: print(f"--- [QwenASR] 初始化引擎 (DML: {config.use_dml}) ---")
 
@@ -246,11 +247,9 @@ class QwenASREngine:
         audio_file: str, 
         language: Optional[str] = None, 
         context: Optional[str] = None, 
-        chunk_size: float = 40.0,
         start_second: float = 0.0,
         duration: float = 0.0,
         temperature: float = 0.4,
-        memory_num: int = 1,
         rollback_num: int = 5
     ) -> TranscribeResult:
         """运行完整转录流水线 (从文件加载音频)"""
@@ -261,8 +260,8 @@ class QwenASREngine:
             audio=audio,
             context=context or "",
             language=language,
-            chunk_size_sec=chunk_size,
-            memory_chunks=memory_num,
+            chunk_size_sec=self.config.chunk_size,
+            memory_chunks=self.config.memory_num,
             temperature=temperature,
             rollback_num=rollback_num
         )
