@@ -89,6 +89,12 @@
 | 📤 **导出指南** | `EXPORT_GUIDE.md` | ⑥ | 2-4 小时 | 模型转换 |
 | 💻 **源码解析** | `SOURCE_CODE.md` | ⑦ | 4-8 周 | 源码研读 |
 
+### 实战案例
+
+| 文档 | 文件名 | 说明 |
+|------|--------|------|
+| 🎤 **PyTorch 路径实战** | [`PRACTICAL_CASE_PYTORCH_INFERENCE.md`](./PRACTICAL_CASE_PYTORCH_INFERENCE.md) | 从一段 WebM 录音出发，完整走通环境排查→依赖安装→模型下载→转录执行的全流程，对比 PyTorch 与 GGUF 两条推理路径 |
+
 ### 快速参考
 
 | 需求 | 推荐文档 | 章节 |
