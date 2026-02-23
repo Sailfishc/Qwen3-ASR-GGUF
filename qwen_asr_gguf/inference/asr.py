@@ -129,8 +129,6 @@ class QwenASREngine:
         display_queue = deque()
         stable_tokens = []
         stable_text_acc = ""
-        cur_pos = total_len
-        gen_batch = self.llama_mod.LlamaBatch(4, 0, 1)
         text_decoder = codecs.getincrementaldecoder('utf-8')(errors='replace')
         
         # 每次解码使用新的随机种子
@@ -141,8 +139,8 @@ class QwenASREngine:
             if last_sampled_token in [self.model.eos_token, self.ID_IM_END]:
                 break
             
-            gen_batch.set_token(last_sampled_token, pos=np.array([cur_pos, cur_pos, cur_pos, 0], dtype=np.int32))
-            self.ctx.decode(gen_batch)
+            if self.ctx.decode_token(last_sampled_token) != 0:
+                    break
             
             display_queue.append(last_sampled_token)
             if len(display_queue) > rollback_num:
@@ -159,7 +157,6 @@ class QwenASREngine:
                     result.is_aborted = True
                     break
             
-            cur_pos += 1
             last_sampled_token = sampler.sample(self.ctx.ptr)
             n_gen_tokens += 1
             
