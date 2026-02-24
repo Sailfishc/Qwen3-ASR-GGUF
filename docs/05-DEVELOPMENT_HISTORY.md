@@ -14,10 +14,10 @@
 
 | 顺位 | 文档 | 文件名 | 目标读者 | 预计耗时 |
 |:----:|------|--------|----------|----------|
-| **①** | [项目架构](./ARCHITECTURE.md) | `ARCHITECTURE.md` | 想了解项目整体设计 | 1-2 小时 |
-| **②** | [集成指南](./INTEGRATION.md) | `INTEGRATION.md` | 想快速使用项目 | 1-2 小时 |
-| **③** | **开发历程** | `DEVELOPMENT_HISTORY.md` | **想了解项目如何构建** | **2-3 小时** |
-| **④** | [学习计划](./LEARNING_PLAN.md) | `LEARNING_PLAN.md` | 想深入理解原理 | 4-12 周 |
+| **①** | [项目架构](./02-ARCHITECTURE.md) | `02-ARCHITECTURE.md` | 想了解项目整体设计 | 1-2 小时 |
+| **②** | [集成指南](./03-INTEGRATION.md) | `03-INTEGRATION.md` | 想快速使用项目 | 1-2 小时 |
+| **③** | **开发历程** | `05-DEVELOPMENT_HISTORY.md` | **想了解项目如何构建** | **2-3 小时** |
+| **④** | [学习计划](./06-LEARNING_PLAN.md) | `06-LEARNING_PLAN.md` | 想深入理解原理 | 4-12 周 |
 | **⑤** | [导出指南](./EXPORT_GUIDE.md) | `EXPORT_GUIDE.md` | 想转换自己的模型 | 2-4 小时 |
 | **⑥** | [源码解析](./SOURCE_CODE.md) | `SOURCE_CODE.md` | 想修改/扩展功能 | 4-8 周 |
 

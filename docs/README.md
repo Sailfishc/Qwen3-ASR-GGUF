@@ -14,7 +14,7 @@
 │                                                                 │
 │  第 ① 步                                                          │
 │  ┌──────────────────────────────────────────────────────────┐  │
-│  │ 📐 ARCHITECTURE.md（项目架构）                            │  │
+│  │ 📐 02-ARCHITECTURE.md（项目架构）                            │  │
 │  │    目标：了解项目整体设计和技术选型                       │  │
 │  │    耗时：1-2 小时                                          │  │
 │  │    适合：所有人                                          │  │
@@ -22,7 +22,7 @@
 │                           ▼                                     │
 │  第 ② 步                                                          │
 │  ┌──────────────────────────────────────────────────────────┐  │
-│  │ 🔧 INTEGRATION.md（集成指南）                             │  │
+│  │ 🔧 03-INTEGRATION.md（集成指南）                             │  │
 │  │    目标：快速上手使用项目                                 │  │
 │  │    耗时：1-2 小时                                          │  │
 │  │    适合：想快速使用的开发者                               │  │
@@ -30,7 +30,7 @@
 │                           ▼                                     │
 │  第 ③ 步                                                          │
 │  ┌──────────────────────────────────────────────────────────┐  │
-│  │ ❓ WHY_EXPORT.md（为什么要导出）                           │  │
+│  │ ❓ 04-WHY_EXPORT.md（为什么要导出）                           │  │
 │  │    目标：理解技术决策的原因                               │  │
 │  │    耗时：1-2 小时                                          │  │
 │  │    适合：想理解"为什么"的开发者                           │  │
@@ -38,7 +38,7 @@
 │                           ▼                                     │
 │  第 ④ 步                                                          │
 │  ┌──────────────────────────────────────────────────────────┐  │
-│  │ 🏗️ DEVELOPMENT_HISTORY.md（开发历程）                     │  │
+│  │ 🏗️ 05-DEVELOPMENT_HISTORY.md（开发历程）                     │  │
 │  │    目标：了解项目如何从零构建                               │  │
 │  │    耗时：2-3 小时                                          │  │
 │  │    适合：想了解构建过程的开发者                           │  │
@@ -46,7 +46,7 @@
 │                           ▼                                     │
 │  第 ⑤ 步                                                          │
 │  ┌──────────────────────────────────────────────────────────┐  │
-│  │ 📖 LEARNING_PLAN.md（学习计划）                           │  │
+│  │ 📖 06-LEARNING_PLAN.md（学习计划）                           │  │
 │  │    目标：系统学习所需知识                                 │  │
 │  │    耗时：4-12 周                                           │  │
 │  │    适合：想深入理解原理的开发者                           │  │
@@ -77,24 +77,30 @@
 
 ## 📚 文档列表
 
+### 快速上手
+
+| 文件名 | 说明 |
+|--------|------|
+| [`01-QUICK_START_MAC.md`](./01-QUICK_START_MAC.md) | 🍎 **macOS 小白快速上手** — 3 步装好环境（ffmpeg + pip + 模型），解释为什么不能用 Ollama 的 dylib，Metal 加速已自动开启，常见错误速查 |
+
 ### 核心文档
 
-| 文档 | 文件名 | 阅读顺位 | 预计耗时 | 适合人群 |
-|------|--------|:--------:|----------|----------|
-| 📐 **项目架构** | [`ARCHITECTURE.md`](./ARCHITECTURE.md) | ① | 1-2 小时 | 所有人 |
-| 🔧 **集成指南** | [`INTEGRATION.md`](./INTEGRATION.md) | ② | 1-2 小时 | 应用开发者 |
-| ❓ **为什么要导出** | [`WHY_EXPORT.md`](./WHY_EXPORT.md) | ③ | 1-2 小时 | 想理解技术决策 |
-| 🏗️ **开发历程** | [`DEVELOPMENT_HISTORY.md`](./DEVELOPMENT_HISTORY.md) | ④ | 2-3 小时 | 想了解构建过程 |
-| 📖 **学习计划** | [`LEARNING_PLAN.md`](./LEARNING_PLAN.md) | ⑤ | 4-12 周 | 深入学习 |
-| 📤 **导出指南** | `EXPORT_GUIDE.md` | ⑥ | 2-4 小时 | 模型转换 |
-| 💻 **源码解析** | `SOURCE_CODE.md` | ⑦ | 4-8 周 | 源码研读 |
+| 文件名 | 说明 | 预计耗时 | 适合人群 |
+|--------|------|----------|----------|
+| [`02-ARCHITECTURE.md`](./02-ARCHITECTURE.md) | 📐 **项目架构** | 1-2 小时 | 所有人 |
+| [`03-INTEGRATION.md`](./03-INTEGRATION.md) | 🔧 **集成指南** | 1-2 小时 | 应用开发者 |
+| [`04-WHY_EXPORT.md`](./04-WHY_EXPORT.md) | ❓ **为什么要导出** | 1-2 小时 | 想理解技术决策 |
+| [`05-DEVELOPMENT_HISTORY.md`](./05-DEVELOPMENT_HISTORY.md) | 🏗️ **开发历程** | 2-3 小时 | 想了解构建过程 |
+| [`06-LEARNING_PLAN.md`](./06-LEARNING_PLAN.md) | 📖 **学习计划** | 4-12 周 | 深入学习 |
+| `07-EXPORT_GUIDE.md` *(待创建)* | 📤 **导出指南** | 2-4 小时 | 模型转换 |
+| `08-SOURCE_CODE.md` *(待创建)* | 💻 **源码解析** | 4-8 周 | 源码研读 |
 
 ### 实战案例
 
 | 文档 | 文件名 | 说明 |
 |------|--------|------|
-| 🎤 **PyTorch 路径实战** | [`PRACTICAL_CASE_PYTORCH_INFERENCE.md`](./PRACTICAL_CASE_PYTORCH_INFERENCE.md) | 从一段 WebM 录音出发，完整走通环境排查→依赖安装→模型下载→转录执行的全流程，对比 PyTorch 与 GGUF 两条推理路径 |
-| ⚡ **GGUF 路径实战** | [`PRACTICAL_CASE_GGUF_INFERENCE.md`](./PRACTICAL_CASE_GGUF_INFERENCE.md) | 在 macOS 上跑通 GGUF 推理路径的完整记录：下载模型包、三种获取 libllama.dylib 的方案（含两次失败）、最终从源码编译成功，RTF 从 0.43 降至 0.104（快 4 倍） |
+| 🎤 **PyTorch 路径实战** | [`CASE-01-PYTORCH_INFERENCE.md`](./CASE-01-PYTORCH_INFERENCE.md) | 从一段 WebM 录音出发，完整走通环境排查→依赖安装→模型下载→转录执行的全流程，对比 PyTorch 与 GGUF 两条推理路径 |
+| ⚡ **GGUF 路径实战** | [`CASE-02-GGUF_INFERENCE.md`](./CASE-02-GGUF_INFERENCE.md) | 在 macOS 上跑通 GGUF 推理路径的完整记录：下载模型包、三种获取 libllama.dylib 的方案（含两次失败）、最终从源码编译成功，RTF 从 0.43 降至 0.104（快 4 倍） |
 
 ### 快速参考
 
@@ -179,11 +185,16 @@
 
 | 文档 | 状态 | 版本 | 最后更新 |
 |------|------|------|----------|
-| ARCHITECTURE.md | ✅ 已完成 | 1.0 | 2026-02-23 |
-| INTEGRATION.md | ✅ 已完成 | 1.0 | 2026-02-23 |
-| LEARNING_PLAN.md | ✅ 已完成 | 1.0 | 2026-02-23 |
-| EXPORT_GUIDE.md | 🚧 待创建 | - | - |
-| SOURCE_CODE.md | 🚧 待创建 | - | - |
+| 01-QUICK_START_MAC.md | ✅ 已完成 | 1.0 | 2026-02-24 |
+| 02-ARCHITECTURE.md | ✅ 已完成 | 1.0 | 2026-02-23 |
+| 03-INTEGRATION.md | ✅ 已完成 | 1.0 | 2026-02-23 |
+| 04-WHY_EXPORT.md | ✅ 已完成 | 1.0 | 2026-02-23 |
+| 05-DEVELOPMENT_HISTORY.md | ✅ 已完成 | 1.0 | 2026-02-23 |
+| 06-LEARNING_PLAN.md | ✅ 已完成 | 1.0 | 2026-02-23 |
+| 07-EXPORT_GUIDE.md | 🚧 待创建 | - | - |
+| 08-SOURCE_CODE.md | 🚧 待创建 | - | - |
+| CASE-01-PYTORCH_INFERENCE.md | ✅ 已完成 | 1.0 | 2026-02-23 |
+| CASE-02-GGUF_INFERENCE.md | ✅ 已完成 | 1.0 | 2026-02-24 |
 
 ---
 
@@ -223,11 +234,12 @@
 ```
 常用文档快速访问：
 
-📐 项目架构：    ./ARCHITECTURE.md
-🔧 集成指南：    ./INTEGRATION.md
-📖 学习计划：    ./LEARNING_PLAN.md
-📤 导出指南：    ./EXPORT_GUIDE.md (待创建)
-💻 源码解析：    ./SOURCE_CODE.md (待创建)
+🍎 macOS 快速上手：./01-QUICK_START_MAC.md
+📐 项目架构：       ./02-ARCHITECTURE.md
+🔧 集成指南：       ./03-INTEGRATION.md
+📖 学习计划：       ./06-LEARNING_PLAN.md
+📤 导出指南：       ./07-EXPORT_GUIDE.md (待创建)
+💻 源码解析：       ./08-SOURCE_CODE.md (待创建)
 
 常用脚本快速访问：
 

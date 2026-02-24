@@ -12,9 +12,9 @@
 
 | 顺位 | 文档 | 文件名 | 目标读者 | 预计耗时 |
 |:----:|------|--------|----------|----------|
-| **①** | [项目架构文档](./ARCHITECTURE.md) | `ARCHITECTURE.md` | 想了解项目整体设计 | 1-2 小时 |
-| **②** | [集成指南](./INTEGRATION.md) | `INTEGRATION.md` | 想快速使用项目 | 1-2 小时 |
-| **③** | **学习计划** | `LEARNING_PLAN.md` | 想深入理解原理 | 4-12 周 |
+| **①** | [项目架构文档](./02-ARCHITECTURE.md) | `02-ARCHITECTURE.md` | 想了解项目整体设计 | 1-2 小时 |
+| **②** | [集成指南](./03-INTEGRATION.md) | `03-INTEGRATION.md` | 想快速使用项目 | 1-2 小时 |
+| **③** | **学习计划** | `06-LEARNING_PLAN.md` | 想深入理解原理 | 4-12 周 |
 | **④** | [导出流程](./EXPORT_GUIDE.md) | `EXPORT_GUIDE.md` | 想转换自己的模型 | 2-4 小时 |
 | **⑤** | [源码解析](./SOURCE_CODE.md) | `SOURCE_CODE.md` | 想修改/扩展功能 | 4-8 周 |
 
@@ -937,7 +937,7 @@ async def transcribe(file: UploadFile = File(...)):
 
 完成本学习计划后，建议：
 
-1. **阅读架构文档** (`ARCHITECTURE.md`) - 深入理解项目设计
+1. **阅读架构文档** (`02-ARCHITECTURE.md`) - 深入理解项目设计
 2. **阅读源码解析** (`SOURCE_CODE.md`) - 逐模块分析代码
 3. **阅读导出指南** (`EXPORT_GUIDE.md`) - 学习模型转换
 4. **动手实践** - 尝试修改和扩展项目
@@ -955,15 +955,15 @@ async def transcribe(file: UploadFile = File(...)):
 │                    Qwen3-ASR-GGUF 文档体系                       │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
-│  ① ARCHITECTURE.md（架构文档）                                  │
+│  ① 02-ARCHITECTURE.md（架构文档）                                  │
 │     └── 目标：了解项目整体设计和技术选型                         │
 │     └── 适合：所有人，1-2 小时阅读                               │
 │                                                                 │
-│  ② INTEGRATION.md（集成指南）                                   │
+│  ② 03-INTEGRATION.md（集成指南）                                   │
 │     └── 目标：快速上手使用项目                                   │
 │     └── 适合：想快速使用的开发者，1-2 小时阅读                    │
 │                                                                 │
-│  ③ LEARNING_PLAN.md（本学习计划）                               │
+│  ③ 06-LEARNING_PLAN.md（本学习计划）                               │
 │     └── 目标：系统学习所需知识                                   │
 │     └── 适合：想深入理解原理的开发者，4-12 周学习                 │
 │                                                                 │

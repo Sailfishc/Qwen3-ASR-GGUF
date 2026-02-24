@@ -1,6 +1,6 @@
 # 实战案例：在 macOS 上跑通 GGUF 推理路径
 
-> 本文是 [PyTorch 路径实战](./PRACTICAL_CASE_PYTORCH_INFERENCE.md) 的续篇。
+> 本文是 [PyTorch 路径实战](./CASE-01-PYTORCH_INFERENCE.md) 的续篇。
 > 我们已经用 PyTorch 路径成功转录了音频，本文记录如何走通
 > **这个项目真正的核心路径**——GGUF 推理——以及途中踩过的每一个坑。
 
