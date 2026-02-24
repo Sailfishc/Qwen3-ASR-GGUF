@@ -556,9 +556,9 @@ GGUF 的劣势:
 ---
 
 **相关文档**：
-- [开发历程](./DEVELOPMENT_HISTORY.md) - 了解完整的构建过程
-- [项目架构](./ARCHITECTURE.md) - 理解整体设计
-- [集成指南](./INTEGRATION.md) - 学习如何使用
+- [开发历程](./05-DEVELOPMENT_HISTORY.md) - 了解完整的构建过程
+- [项目架构](./02-ARCHITECTURE.md) - 理解整体设计
+- [集成指南](./03-INTEGRATION.md) - 学习如何使用
 
 ---
 
