@@ -83,6 +83,12 @@
 |--------|------|
 | [`01-QUICK_START_MAC.md`](./01-QUICK_START_MAC.md) | 🍎 **macOS 小白快速上手** — 3 步装好环境（ffmpeg + pip + 模型），解释为什么不能用 Ollama 的 dylib，Metal 加速已自动开启，常见错误速查 |
 
+### 学习指南
+
+| 文件名 | 说明 |
+|--------|------|
+| [`GUIDE-BUILD-INFERENCE.md`](./GUIDE-BUILD-INFERENCE.md) | 🎓 **从零构建推理脚本（导师指南）** — 假设你是新手，7 个前置知识模块 + 8 步手把手构建推理流水线，解释每一行代码"为什么这样写"，包含关键难点汇总和调试建议 |
+
 ### 核心文档
 
 | 文件名 | 说明 | 预计耗时 | 适合人群 |
@@ -195,6 +201,7 @@
 | 08-SOURCE_CODE.md | 🚧 待创建 | - | - |
 | CASE-01-PYTORCH_INFERENCE.md | ✅ 已完成 | 1.0 | 2026-02-23 |
 | CASE-02-GGUF_INFERENCE.md | ✅ 已完成 | 1.0 | 2026-02-24 |
+| GUIDE-BUILD-INFERENCE.md | ✅ 已完成 | 1.0 | 2026-02-24 |
 
 ---
 
